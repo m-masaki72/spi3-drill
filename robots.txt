@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://spi3.morilab-garage.com/sitemap.xml

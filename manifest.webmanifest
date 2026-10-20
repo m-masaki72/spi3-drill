@@ -1,0 +1,23 @@
+{
+  "id": "./",
+  "name": "SPI3ドリル（非公式）",
+  "short_name": "SPI3ドリル",
+  "description": "SPI3の非言語・言語の練習問題を毎回自動で作って出題する練習用Webアプリ",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f5f1",
+  "theme_color": "#1f6feb",
+  "lang": "ja",
+  "dir": "ltr",
+  "categories": ["education"],
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "screenshots": [
+    { "src": "og.png", "sizes": "1200x630", "type": "image/png", "form_factor": "wide", "label": "SPI3ドリル（非公式）" }
+  ]
+}

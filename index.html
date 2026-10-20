@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>SPI3ドリル（非公式） | 非言語・言語の練習問題が無限に解ける無料Webアプリ</title>
+<meta name="description" content="SPI3の非言語（割合・損益算・速さ・確率・推論・表の読み取りなど17分野）と言語（二語の関係・熟語・語句の用法・長文など9分野）の練習問題を、毎回自動で作って出題する無料のWebアプリ。お手軽モードと、制限時間・メモ・電卓つきの本番モードがあります。登録不要、オフラインでも使えます。">
+<link rel="canonical" href="https://spi3.morilab-garage.com/">
+<meta name="theme-color" content="#f6f5f1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#15171b" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="SPI3ドリル">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="icon" href="icons/icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="SPI3ドリル（非公式）">
+<meta property="og:title" content="SPI3ドリル（非公式） | 非言語・言語の練習問題が無限に解ける">
+<meta property="og:description" content="非言語17分野・言語9分野の問題を毎回自動で作って出題。お手軽モードと、制限時間・メモ・電卓つきの本番モード。">
+<meta property="og:url" content="https://spi3.morilab-garage.com/">
+<meta property="og:image" content="https://spi3.morilab-garage.com/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="ja_JP">
+<meta name="twitter:card" content="summary_large_image">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebApplication",
+      "@id": "https://spi3.morilab-garage.com/#app",
+      "name": "SPI3ドリル（非公式）",
+      "url": "https://spi3.morilab-garage.com/",
+      "description": "SPI3の非言語・言語の練習問題を毎回自動で作って出題する無料のWebアプリ。お手軽モードと、制限時間・メモ・電卓つきの本番モードがあります。",
+      "applicationCategory": "EducationalApplication",
+      "operatingSystem": "Android, iOS, Windows, macOS",
+      "browserRequirements": "JavaScript に対応したモダンブラウザ",
+      "inLanguage": "ja",
+      "isAccessibleForFree": true,
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
+      "author": { "@type": "Organization", "name": "Mori Lab", "url": "https://morilab-garage.com/" }
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "本物のSPI3の問題ですか？",
+          "acceptedAnswer": { "@type": "Answer", "text": "いいえ。出題形式を参考にして、数値や設定をその場で自動で作ったオリジナルの練習問題です。実際の試験の問題を写したものではありません。" }
+        },
+        {
+          "@type": "Question",
+          "name": "お手軽モードと本番モードの違いは？",
+          "acceptedAnswer": { "@type": "Answer", "text": "お手軽モードは小さな数で解き方の要点だけを練習し、答えるとすぐ解説が出ます。本番モードは本番に近い数と形式で1問ごとに制限時間があり、メモと電卓を使えます。解説は最後にまとめて出ます。一部の問題は数値を直接入力して答えます。" }
+        },
+        {
+          "@type": "Question",
+          "name": "同じ問題ばかり出ませんか？",
+          "acceptedAnswer": { "@type": "Answer", "text": "非言語の問題は毎回数値と設定を作り直すので、ほぼ同じ問題は出ません。言語の問題は用意した語句や文章の組み合わせから出題します。" }
+        },
+        {
+          "@type": "Question",
+          "name": "記録はどこに保存されますか？",
+          "acceptedAnswer": { "@type": "Answer", "text": "正答率などの記録は使っているブラウザの中だけに保存され、外部には送信しません。「記録を消す」でいつでも消せます。" }
+        }
+      ]
+    }
+  ]
+}
+</script>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body data-screen="home">
+<div class="wrap">
+  <header class="site">
+    <h1>SPI3ドリル<small>（非公式）</small></h1>
+    <p>非言語・言語の練習問題を、毎回その場で作って出題します。</p>
+  </header>
+
+  <main>
+    <!-- ホーム -->
+    <section id="home">
+      <section class="card">
+        <h2>モード</h2>
+        <div class="seg mode">
+          <button type="button" data-mode="easy" aria-pressed="true">お手軽</button>
+          <button type="button" data-mode="exam" aria-pressed="false">本番</button>
+        </div>
+        <p class="desc" id="mode-desc"></p>
+        <div class="row">
+          <span>問題数</span>
+          <div class="seg">
+            <button type="button" data-count="5" aria-pressed="false">5問</button>
+            <button type="button" data-count="10" aria-pressed="true">10問</button>
+            <button type="button" data-count="20" aria-pressed="false">20問</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>まとめて解く</h2>
+        <div class="mix">
+          <button type="button" class="btn primary" data-mix="all">全分野ミックス</button>
+          <button type="button" class="btn" data-mix="非言語">非言語だけ</button>
+          <button type="button" class="btn" data-mix="言語">言語だけ</button>
+          <button type="button" class="btn" data-mix="weak">苦手な分野から</button>
+        </div>
+        <p class="total" id="home-total"></p>
+      </section>
+
+      <section class="card">
+        <h2>非言語（17分野）</h2>
+        <div class="cats" id="cats-nonverbal"></div>
+        <h2 style="margin-top:18px">言語（9分野）</h2>
+        <div class="cats" id="cats-verbal"></div>
+        <div class="btns"><button type="button" class="btn small" id="reset-stats">記録を消す</button></div>
+      </section>
+
+      <section class="card">
+        <h2>公式・ポイント一覧</h2>
+        <p class="sub">分野ごとの公式と解き方のポイントです。本番前の見直しにどうぞ。</p>
+        <div id="points-all"></div>
+      </section>
+    </section>
+
+    <!-- 出題 -->
+    <section id="quiz" hidden>
+      <div class="qhead">
+        <div class="meta">
+          <span><b id="q-progress"></b>　<span id="q-cat"></span></span>
+          <span id="q-time"></span>
+        </div>
+        <div class="bar"><div id="q-bar"></div></div>
+      </div>
+      <div class="qgrid">
+        <div class="card qmain">
+          <div id="q-body" tabindex="-1"></div>
+          <div id="q-choices"></div>
+          <div id="q-explain" hidden aria-live="polite"></div>
+          <div class="actions">
+            <button type="button" class="btn small" id="q-quit">やめる</button>
+            <button type="button" class="btn primary" id="q-next" hidden>次へ</button>
+          </div>
+        </div>
+        <aside class="tools" aria-label="メモと電卓">
+          <div class="toolbtns">
+            <button type="button" class="btn small" data-tool="memo" aria-pressed="true">メモ</button>
+            <button type="button" class="btn small" data-tool="calc" aria-pressed="true">電卓</button>
+          </div>
+          <div class="tool" id="tool-memo">
+            <div class="tool-head"><span>メモ（指やペンで書けます）</span><button type="button" class="btn small" id="memo-clear">消す</button></div>
+            <canvas id="memo" aria-label="手書きメモ"></canvas>
+          </div>
+          <div class="tool" id="tool-calc">
+            <div id="calc">
+              <div id="calc-disp"><span id="calc-op"></span><span id="calc-out">0</span></div>
+              <div class="keys">
+                <button type="button" data-k="C" class="op">C</button>
+                <button type="button" data-k="⌫" class="op" aria-label="1文字消す">⌫</button>
+                <button type="button" data-k="÷" class="op">÷</button>
+                <button type="button" data-k="×" class="op">×</button>
+                <button type="button" data-k="7">7</button>
+                <button type="button" data-k="8">8</button>
+                <button type="button" data-k="9">9</button>
+                <button type="button" data-k="−" class="op">−</button>
+                <button type="button" data-k="4">4</button>
+                <button type="button" data-k="5">5</button>
+                <button type="button" data-k="6">6</button>
+                <button type="button" data-k="+" class="op">+</button>
+                <button type="button" data-k="1">1</button>
+                <button type="button" data-k="2">2</button>
+                <button type="button" data-k="3">3</button>
+                <button type="button" data-k="=" class="eq" style="grid-row:span 2">=</button>
+                <button type="button" data-k="0" style="grid-column:span 2">0</button>
+                <button type="button" data-k=".">.</button>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- 結果 -->
+    <section id="result" hidden>
+      <section class="card">
+        <p class="score" id="r-score"></p>
+        <p id="r-meta"></p>
+        <div id="r-cats"></div>
+        <div class="btns">
+          <button type="button" class="btn primary" id="r-miss">間違えた分野をもう一度</button>
+          <button type="button" class="btn" id="r-again">同じ条件でもう一度</button>
+          <button type="button" class="btn" id="r-home">ホームへ</button>
+          <a class="btn" id="r-share" href="#" target="_blank" rel="noopener">Xで共有</a>
+        </div>
+      </section>
+      <section class="card">
+        <h2>見直し</h2>
+        <div id="r-review"></div>
+      </section>
+    </section>
+
+    <!-- 説明 -->
+    <section class="card about">
+      <h2>使い方</h2>
+      <ol>
+        <li>「お手軽」か「本番」を選びます。</li>
+        <li>まとめて解くか、分野のボタンを押して始めます。</li>
+        <li>選択肢は A〜H キー（または 1〜8 キー）、次の問題へは Enter キーでも進めます。</li>
+        <li>最後に分野ごとの正解数と、全問の解説が出ます。正答率は分野ごとに記録されます。</li>
+      </ol>
+      <h3>2つのモード</h3>
+      <dl>
+        <dt>お手軽</dt>
+        <dd>計算が軽くなるよう小さな数で出題し、解き方の要点だけを練習します。答えるとすぐに正誤と解説が出ます。時間制限はなく、目安の時間だけ表示します。</dd>
+        <dt>本番</dt>
+        <dd>本番に近い数と形式で、1問ごとに制限時間があります。時間が来ると次の問題へ進みます。画面の横（スマホでは下）のメモと電卓が使え、一部の問題は数値を直接入力して答えます。解説は最後にまとめて出ます。</dd>
+      </dl>
+      <h3>よくある質問</h3>
+      <dl>
+        <dt>本物のSPI3の問題ですか？</dt>
+        <dd>いいえ。出題形式を参考にして、数値や設定をその場で自動で作ったオリジナルの練習問題です。実際の試験の問題を写したものではありません。</dd>
+        <dt>お手軽モードと本番モードの違いは？</dt>
+        <dd>お手軽モードは小さな数で解き方の要点だけを練習し、答えるとすぐ解説が出ます。本番モードは本番に近い数と形式で1問ごとに制限時間があり、メモと電卓を使えます。解説は最後にまとめて出ます。一部の問題は数値を直接入力して答えます。</dd>
+        <dt>同じ問題ばかり出ませんか？</dt>
+        <dd>非言語の問題は毎回数値と設定を作り直すので、ほぼ同じ問題は出ません。言語の問題は用意した語句や文章の組み合わせから出題します。</dd>
+        <dt>記録はどこに保存されますか？</dt>
+        <dd>正答率などの記録は使っているブラウザの中だけに保存され、外部には送信しません。「記録を消す」でいつでも消せます。</dd>
+      </dl>
+      <p class="note">このアプリは個人が作った非公式の練習用ツールで、株式会社リクルートマネジメントソリューションズとは関係ありません。「SPI」は株式会社リクルートの登録商標です。出題形式や制限時間は公開されている情報をもとにした目安で、実際の試験とは異なる場合があります。</p>
+    </section>
+  </main>
+
+  <footer>
+    <p>© <span id="year">2026</span> <a href="https://morilab-garage.com/projects/spi3-drill/">Mori Lab</a> ・ <a href="https://github.com/m-masaki72/spi3-drill">GitHub</a></p>
+  </footer>
+</div>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
