@@ -12,6 +12,7 @@ const MODES = {
   exam: { name: "本番", desc: "本番に近い数と形式で、1問ごとに制限時間があります。メモと電卓が使えます。解説は最後にまとめて出ます。" },
 };
 const TYPE_RATE = 0.35; // 本番で数値を直接入力させる割合
+const MOCK_N = 15; // 模試の1セクションの問題数（言語・非言語それぞれ）
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" })[c]);
@@ -37,14 +38,18 @@ if (!MODES[mode]) mode = "easy";
 let count = store.get("spi3Count", 10);
 if (![5, 10, 20].includes(count)) count = 10;
 let stats = store.get("spi3Stats", {});
+let mocks = store.get("spi3Mock", []);
+if (!Array.isArray(mocks)) mocks = [];
 
 const statOf = (m, id) => stats[m]?.[id] ?? { n: 0, ok: 0, sec: 0 };
-function record(id, ok, sec) {
-  stats[mode] ??= {};
-  const s = statOf(mode, id);
-  stats[mode][id] = { n: s.n + 1, ok: s.ok + (ok ? 1 : 0), sec: s.sec + sec };
+function record(id, ok, sec, m) {
+  stats[m] ??= {};
+  const s = statOf(m, id);
+  stats[m][id] = { n: s.n + 1, ok: s.ok + (ok ? 1 : 0), sec: s.sec + sec };
   store.set("spi3Stats", stats);
 }
+const pct = (ok, n) => Math.round((ok / n) * 100);
+const mmss = (sec) => `${Math.floor(sec / 60)}分${String(Math.floor(sec % 60)).padStart(2, "0")}秒`;
 
 function show(id) {
   for (const s of ["home", "quiz", "result"]) $(`#${s}`).hidden = s !== id;
@@ -75,6 +80,38 @@ function renderHome() {
   $("#points-all").innerHTML = CATS.map((c) => `<details class="pts"><summary>${c.group}｜${c.name}</summary>${pointsList(c.id)}</details>`).join("");
   const total = Object.values(stats[mode] ?? {}).reduce((a, s) => ({ n: a.n + s.n, ok: a.ok + s.ok }), { n: 0, ok: 0 });
   $("#home-total").textContent = total.n ? `${MODES[mode].name}モードの記録：${total.n}問・正答率${Math.round((total.ok / total.n) * 100)}%` : "";
+  renderWeak();
+  renderMockLast();
+}
+
+// 苦手分析：挑戦した分野を正答率の低い順に並べる
+function renderWeak() {
+  const rows = CATS.map((c) => ({ c, s: statOf(mode, c.id) })).filter((x) => x.s.n > 0)
+    .sort((a, b) => a.s.ok / a.s.n - b.s.ok / b.s.n || b.s.n - a.s.n).slice(0, 6);
+  $("#weak-card").hidden = rows.length === 0;
+  if (!rows.length) return;
+  const exam = mode === "exam";
+  $("#weak-desc").textContent = `${MODES[mode].name}モードの記録から、正答率の低い分野を表示しています。押すとその分野を練習できます。`;
+  $("#weak-list").replaceChildren(...rows.map(({ c, s }) => {
+    const p = pct(s.ok, s.n), avg = Math.round(s.sec / s.n), target = c.time[exam ? 1 : 0];
+    const b = el("button", "weak-row", `<span class="name">${c.group}・${c.name}</span><span class="pct">${p}%</span><span class="meter"><div></div></span><span class="info">${s.n}問・平均${avg}秒（${exam ? "制限" : "目安"}${target}秒）${avg > target ? "・時間オーバー気味" : ""}</span>`);
+    b.type = "button";
+    const bar = b.querySelector(".meter > div");
+    bar.style.width = `${Math.max(p, 2)}%`; // CSP で style 属性は使えないので JS で幅を入れる
+    if (p < 50) bar.classList.add("low"); else if (p < 75) bar.classList.add("mid");
+    b.addEventListener("click", () => start({ ids: [c.id], label: c.name }));
+    return b;
+  }));
+}
+
+function renderMockLast() {
+  const last = mocks.at(-1);
+  if (!last) { $("#mock-last").textContent = ""; return; }
+  const sum = (m) => m.s.reduce((a, [ok]) => a + ok, 0);
+  const n = last.s.reduce((a, [, k]) => a + k, 0);
+  const best = Math.max(...mocks.map(sum));
+  const d = new Date(last.d);
+  $("#mock-last").textContent = `前回（${d.getMonth() + 1}/${d.getDate()}）：${sum(last)} / ${n}問（言語${last.s[0][0]}・非言語${last.s[1][0]}）　最高：${best}問`;
 }
 
 document.querySelectorAll("[data-mode]").forEach((b) => b.addEventListener("click", () => {
@@ -93,6 +130,7 @@ document.querySelectorAll("[data-mix]").forEach((b) => b.addEventListener("click
   const ids = CATS.filter((c) => mix === "all" || c.group === mix).map((c) => c.id);
   start({ ids, label: mix === "all" ? "全分野ミックス" : `${mix}ミックス` });
 }));
+$("#mock-start").addEventListener("click", () => start({ mock: true, label: "模試" }));
 // 2回押しで確定するボタン。1回目は文言を変えて待ち、時間が過ぎたら元に戻す
 function confirmTwice(b, ask, idle, ms) {
   clearTimeout(b._t);
@@ -137,9 +175,15 @@ function pickIds(ids, weak, n) {
 }
 
 function start(opts) {
-  const hard = mode === "exam";
+  // 模試はいつも本番の難易度で、記録も本番モードに入れる
+  const m = opts.mock ? "exam" : mode;
+  const hard = m === "exam";
   const seen = new Set();
-  const qs = pickIds(opts.ids, opts.weak, count).map((id) => {
+  const groupIds = (g) => CATS.filter((c) => c.group === g).map((c) => c.id);
+  const ids = opts.mock
+    ? [...pickIds(groupIds("言語"), false, MOCK_N), ...pickIds(groupIds("非言語"), false, MOCK_N)]
+    : pickIds(opts.ids, opts.weak, count);
+  const qs = ids.map((id) => {
     const cat = byId[id];
     let q;
     for (let t = 0; t < 8; t++) {
@@ -150,7 +194,14 @@ function start(opts) {
     const typed = hard && q.num != null && Math.random() < TYPE_RATE;
     return { ...q, cat, typed, pick: null, input: "", ok: false, sec: 0 };
   });
-  quiz = { opts, hard, qs, i: 0 };
+  quiz = { opts, mode: m, hard, qs, i: 0, quit: false };
+  // 模試の時間はセクション（言語・非言語）ごと。各問の制限時間の合計を持ち時間にする
+  if (opts.mock) {
+    quiz.sections = ["言語", "非言語"].map((g) => {
+      const from = qs.findIndex((q) => q.cat.group === g), to = qs.findLastIndex((q) => q.cat.group === g);
+      return { name: g, from, to, limit: qs.slice(from, to + 1).reduce((a, q) => a + q.cat.time[1], 0), end: 0 };
+    });
+  }
   document.body.classList.toggle("exam", hard);
   show("quiz");
   renderQuestion();
@@ -163,11 +214,23 @@ const parseNum = (s) => {
 
 let timer = 0, t0 = 0;
 
+const sectionOf = (i) => quiz.sections?.find((s) => i >= s.from && i <= s.to);
+
+// 模試のセクションの時間切れ：今の問題を締め、残りは未着手のまま次のセクション（または結果）へ
+function timeUp(part) {
+  finishQ(quiz.qs[quiz.i], true);
+  for (const q of quiz.qs.slice(quiz.i + 1, part.to + 1)) Object.assign(q, { done: true, timeout: true, skipped: true, ok: false, sec: 0 });
+  quiz.i = part.to;
+  advance(true);
+}
+
 function renderQuestion() {
   const { qs, i, hard } = quiz;
   const q = qs[i];
-  const limit = q.cat.time[1];
-  $("#q-progress").textContent = `${i + 1} / ${qs.length}`;
+  const part = sectionOf(i);
+  const limit = part ? part.limit : q.cat.time[1];
+  if (part && !part.end) part.end = performance.now() + part.limit * 1000;
+  $("#q-progress").textContent = part ? `${part.name} ${i - part.from + 1} / ${part.to - part.from + 1}` : `${i + 1} / ${qs.length}`;
   $("#q-cat").textContent = `${q.cat.group}・${q.cat.name}`;
   $("#q-body").innerHTML = q.q;
   $("#q-explain").hidden = true;
@@ -200,6 +263,14 @@ function renderQuestion() {
   clearInterval(timer);
   const bar = $("#q-bar"), tm = $("#q-time");
   const tick = () => {
+    if (part) {
+      const left = Math.max(0, (part.end - performance.now()) / 1000);
+      tm.textContent = `残り${mmss(Math.ceil(left))}`;
+      bar.style.width = `${(left / limit) * 100}%`;
+      bar.classList.toggle("warn", left < 60);
+      if (left <= 0) timeUp(part);
+      return;
+    }
     const sec = (performance.now() - t0) / 1000;
     if (hard) {
       const left = Math.max(0, limit - sec);
@@ -249,7 +320,10 @@ function finishQ(q, timeout = false) {
   if (q.done) return;
   q.done = true;
   clearInterval(timer);
-  q.sec = Math.min(q.cat.time[1], Math.round((performance.now() - t0) / 1000));
+  const spent = Math.round((performance.now() - t0) / 1000);
+  // 模試は1問の上限がない代わりに、セクションの残り時間を超えないようにする
+  const part = sectionOf(quiz.i);
+  q.sec = Math.min(part ? Math.round((part.end - t0) / 1000) : q.cat.time[1], spent);
   if (q.typed) {
     const v = parseNum(q.input);
     q.ok = Number.isFinite(v) && Math.abs(v - q.num) < 1e-6;
@@ -257,13 +331,12 @@ function finishQ(q, timeout = false) {
     q.ok = q.pick === q.answer;
   }
   q.timeout = timeout && (q.typed ? q.input.trim() === "" : q.pick == null);
-  record(q.cat.id, q.ok, q.sec);
+  record(q.cat.id, q.ok, q.sec, quiz.mode);
 }
 
 function advance(timeout = false) {
   const q = quiz.qs[quiz.i];
-  finishQ(q, timeout);
-  if (quiz.i < quiz.qs.length - 1) {
+  finishQ(q, timeout);  if (quiz.i < quiz.qs.length - 1) {
     quiz.i++;
     renderQuestion();
   } else {
@@ -275,7 +348,9 @@ $("#q-next").addEventListener("click", () => advance());
 $("#q-quit").addEventListener("click", () => {
   if (!confirmTwice($("#q-quit"), "もう一度押すと終了", "やめる", 3000)) return;
   clearInterval(timer);
-  quiz.qs = quiz.qs.filter((q) => q.done);
+  quiz.quit = true;
+  quiz.qs = quiz.qs.filter((q) => q.done && !q.skipped);
+  if (quiz.sections) quiz.sections = null; // 途中でやめた模試は通常の結果として見せ、履歴にも残さない
   if (quiz.qs.length) renderResult();
   else { show("home"); renderHome(); }
 });
@@ -283,11 +358,26 @@ $("#q-quit").addEventListener("click", () => {
 // ---- 結果 ----
 function renderResult() {
   clearInterval(timer);
-  const { qs, opts } = quiz;
+  const { qs, opts, sections } = quiz;
   const ok = qs.filter((q) => q.ok).length;
   const avg = Math.round(qs.reduce((a, q) => a + q.sec, 0) / qs.length);
   $("#r-score").innerHTML = `<b>${ok}</b> / ${qs.length}問 正解`;
-  $("#r-meta").textContent = `${MODES[mode].name}モード・${opts.label}・1問あたり平均${avg}秒`;
+  $("#r-meta").textContent = opts.mock ? `模試（本番形式）・1問あたり平均${avg}秒` : `${MODES[quiz.mode].name}モード・${opts.label}・1問あたり平均${avg}秒`;
+
+  // 模試はセクションごとの成績を出して履歴に残す
+  const parts = sections?.map((s) => {
+    const list = qs.slice(s.from, s.to + 1);
+    return { name: s.name, ok: list.filter((q) => q.ok).length, n: list.length, sec: list.reduce((a, q) => a + q.sec, 0), limit: s.limit, left: list.filter((q) => q.skipped).length };
+  });
+  $("#r-sections").hidden = !parts;
+  if (parts) {
+    $("#r-sections").innerHTML = parts.map((p) => `<div><span>${p.name}</span><b>${p.ok} / ${p.n}</b><span>${pct(p.ok, p.n)}%・${mmss(p.sec)} / ${mmss(p.limit)}${p.left ? `・未着手${p.left}問` : ""}</span></div>`).join("");
+    if (!quiz.saved) {
+      quiz.saved = true;
+      mocks = [...mocks, { d: Date.now(), s: parts.map((p) => [p.ok, p.n, p.sec]) }].slice(-20);
+      store.set("spi3Mock", mocks);
+    }
+  }
 
   const per = {};
   for (const q of qs) {
@@ -316,7 +406,9 @@ function renderResult() {
   retryMiss.onclick = () => start({ ids: missIds, label: "間違えた分野" });
   $("#r-again").onclick = () => start(opts);
 
-  const text = `SPI3ドリル（非公式）の${MODES[mode].name}モードで${qs.length}問中${ok}問正解しました`;
+  const text = parts
+    ? `SPI3ドリル（非公式）の模試で${parts.map((p) => `${p.name}${p.ok}/${p.n}`).join("・")}でした`
+    : `SPI3ドリル（非公式）の${MODES[quiz.mode].name}モードで${qs.length}問中${ok}問正解しました`;
   $("#r-share").href = `https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(location.origin + location.pathname)}`;
   show("result");
 }
@@ -433,6 +525,36 @@ document.addEventListener("keydown", (e) => {
     e.preventDefault();
   }
 });
+
+// ---- ホーム画面に追加 ----
+// Chrome・Edge は beforeinstallprompt でボタンから追加できる。iPhone の Safari にはこの仕組みがないので手順を出す
+const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+let installEvt = null;
+const showInstall = () => { if (!standalone && !store.get("spi3InstallClosed", false)) $("#install").hidden = false; };
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  installEvt = e;
+  $("#install-btn").hidden = false;
+  showInstall();
+});
+if (isIOS) {
+  $("#install-desc").textContent = "Safari の共有ボタン（□に↑）から「ホーム画面に追加」を選ぶと、アプリのように開けて、電波のない場所でも練習できます。";
+  $("#install-btn").hidden = true;
+  showInstall();
+}
+$("#install-btn").addEventListener("click", async () => {
+  if (!installEvt) return;
+  installEvt.prompt();
+  await installEvt.userChoice.catch(() => {});
+  installEvt = null;
+  $("#install").hidden = true;
+});
+$("#install-close").addEventListener("click", () => {
+  store.set("spi3InstallClosed", true);
+  $("#install").hidden = true;
+});
+window.addEventListener("appinstalled", () => { $("#install").hidden = true; });
 
 // ---- 起動 ----
 document.querySelector("#year").textContent = new Date().getFullYear();

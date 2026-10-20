@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>SPI3ドリル（非公式） | 非言語・言語の練習問題が無限に解ける無料Webアプリ</title>
-<meta name="description" content="SPI3の非言語（割合・損益算・速さ・確率・推論・表の読み取りなど17分野）と言語（二語の関係・熟語・語句の用法・長文など9分野）の練習問題を、毎回自動で作って出題する無料のWebアプリ。お手軽モードと、制限時間・メモ・電卓つきの本番モードがあります。登録不要、オフラインでも使えます。">
+<meta name="description" content="SPI3の非言語（割合・損益算・速さ・確率・推論・表の読み取りなど19分野）と言語（二語の関係・熟語・語句の用法・長文など9分野）の練習問題を、毎回自動で作って出題する無料のWebアプリ。お手軽モードと、制限時間・メモ・電卓つきの本番モードがあります。登録不要、オフラインでも使えます。">
 <link rel="canonical" href="https://spi3.morilab-garage.com/">
 <meta name="theme-color" content="#f6f5f1" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#15171b" media="(prefers-color-scheme: dark)">
@@ -22,7 +22,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="SPI3ドリル（非公式）">
 <meta property="og:title" content="SPI3ドリル（非公式） | 非言語・言語の練習問題が無限に解ける">
-<meta property="og:description" content="非言語17分野・言語9分野の問題を毎回自動で作って出題。お手軽モードと、制限時間・メモ・電卓つきの本番モード。">
+<meta property="og:description" content="非言語19分野・言語9分野の問題を毎回自動で作って出題。お手軽モードと、制限時間・メモ・電卓つきの本番モード。">
 <meta property="og:url" content="https://spi3.morilab-garage.com/">
 <meta property="og:image" content="https://spi3.morilab-garage.com/og.png">
 <meta property="og:image:width" content="1200">
@@ -96,6 +96,22 @@
   <main>
     <!-- ホーム -->
     <section id="home">
+      <section class="card install" id="install" hidden>
+        <div>
+          <b>ホーム画面に追加</b>
+          <p class="sub" id="install-desc">アプリのように開けて、電波のない場所でも練習できます。</p>
+        </div>
+        <button type="button" class="btn primary" id="install-btn">追加する</button>
+        <button type="button" class="btn small" id="install-close" aria-label="閉じる">×</button>
+      </section>
+
+      <section class="card">
+        <h2>模試</h2>
+        <p class="desc">言語15問 → 非言語15問を、分野をまぜて本番形式で解きます。時間は言語・非言語それぞれの合計で、残り時間がなくなると次へ進みます。</p>
+        <div class="btns"><button type="button" class="btn primary" id="mock-start">模試をはじめる</button></div>
+        <p class="total" id="mock-last"></p>
+      </section>
+
       <section class="card">
         <h2>モード</h2>
         <div class="seg mode">
@@ -124,8 +140,14 @@
         <p class="total" id="home-total"></p>
       </section>
 
+      <section class="card" id="weak-card" hidden>
+        <h2>苦手分析</h2>
+        <p class="sub" id="weak-desc"></p>
+        <div id="weak-list"></div>
+      </section>
+
       <section class="card">
-        <h2>非言語（17分野）</h2>
+        <h2>非言語（19分野）</h2>
         <div class="cats" id="cats-nonverbal"></div>
         <h2 class="gap">言語（9分野）</h2>
         <div class="cats" id="cats-verbal"></div>
@@ -201,6 +223,7 @@
       <section class="card">
         <p class="score" id="r-score"></p>
         <p id="r-meta"></p>
+        <div class="sections" id="r-sections" hidden></div>
         <div id="r-cats"></div>
         <div class="btns">
           <button type="button" class="btn primary" id="r-miss">間違えた分野をもう一度</button>

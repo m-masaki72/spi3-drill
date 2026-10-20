@@ -103,6 +103,28 @@ h3 { font-size: 1rem; margin: 18px 0 8px; }
 .btn.small { padding: 6px 12px; font-size: .88rem; font-weight: 500; }
 .total { color: var(--sub); font-size: .88rem; margin: 10px 0 0; }
 
+/* ホーム画面に追加 */
+.install { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.install > div { flex: 1 1 12em; }
+.install .sub { margin: 4px 0 0; }
+
+/* 苦手分析 */
+.weak-row { width: 100%; text-align: left; background: none; border: 0; border-top: 1px solid var(--line); color: inherit; font: inherit; cursor: pointer; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; padding: 8px 0; }
+.weak-row:first-child { border-top: 0; }
+.weak-row .name { font-weight: 600; }
+.weak-row .pct { font-weight: 700; text-align: right; }
+.weak-row .meter { grid-column: 1 / -1; height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.weak-row .meter > div { height: 100%; background: var(--ok); }
+.weak-row .meter > div.mid { background: var(--warn); }
+.weak-row .meter > div.low { background: var(--ng); }
+.weak-row .info { grid-column: 1 / -1; color: var(--sub); font-size: .82rem; }
+
+/* 模試の結果（言語・非言語） */
+.sections { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin: 10px 0; }
+.sections > div { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.sections b { display: block; font-size: 1.3rem; }
+.sections span { color: var(--sub); font-size: .85rem; }
+
 .cats { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
 .cat {
   text-align: left;

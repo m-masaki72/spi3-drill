@@ -28,6 +28,24 @@ function narrow(r, cands, makeClue, hard, minClues = 2) {
   }, 300);
 }
 
+// 聞きたいことが決まる（done が真になる）まで手がかりを足す。skip に当たる手がかり（答えそのもの）は使わない
+function narrowUntil(r, cands, makeClue, done, skip = () => false, minClues = 2) {
+  return retry(() => {
+    let rest = cands;
+    const clues = [];
+    for (let i = 0; i < 300 && clues.length < 5; i++) {
+      const c = makeClue();
+      if (!c || skip(c) || clues.some((x) => x.key === c.key)) continue;
+      const next = rest.filter(c.test);
+      if (next.length === rest.length) continue;
+      rest = next;
+      clues.push(c);
+      if (clues.length >= minClues && done(rest)) return { clues, rest };
+    }
+    return null;
+  }, 300);
+}
+
 // 「必ず正しいといえるもの」の文を3つ選ぶ。候補すべてで成り立つ文が正解
 function pickStatements(r, rest, pool, clues) {
   const used = new Set(clues.map((c) => c.key));
@@ -771,6 +789,122 @@ export const NONVERBAL = [
         const st = pickStatements(r, rest, pool, clues);
         return st && mustQuestion(intro, clues, st, rest, show);
       }, 50);
+    },
+  },
+
+  {
+    id: "shouhai", name: "推論（勝敗）", time: [60, 120],
+    tip: "総当たり戦は対戦表（○×の表）を書く。4チームなら試合は6試合で、勝ち数の合計も6になる。",
+    gen(r, hard) {
+      const names = ["P", "Q", "R", "S"], n = names.length;
+      const games = [];
+      for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) games.push([i, j]);
+      // 候補は各試合の勝者の並び（2^6 = 64通り）
+      const cands = [...Array(2 ** games.length).keys()].map((m) => games.map(([a, b], k) => ((m >> k) & 1 ? b : a)));
+      const wins = (p) => names.map((_, i) => p.filter((w) => w === i).length);
+      const gi = (i, j) => games.findIndex(([a, b]) => (a === i && b === j) || (a === j && b === i));
+      const wl = (w) => `${w}勝${n - 1 - w}敗`;
+      const t = r.pick(cands), tw = wins(t);
+      const makeClue = () => {
+        let [i, j] = r.sample(ranks(n).map((x) => x - 1), 2);
+        switch (r.pick(["beat", "beat", "rec", "rec", "more", "all"])) {
+          case "beat": {
+            const k = gi(i, j), w = t[k], l = w === i ? j : i;
+            return { key: `b${k}`, text: `${names[w]}は${names[l]}に勝った`, test: (p) => p[k] === w };
+          }
+          case "rec":
+            return { key: `r${i}`, text: `${names[i]}は${wl(tw[i])}だった`, test: (p) => wins(p)[i] === tw[i] };
+          case "more":
+            if (tw[i] === tw[j]) return { key: `q${[i, j].sort()}`, text: `${names[i]}と${names[j]}の勝ち数は同じだった`, test: (p) => { const w = wins(p); return w[i] === w[j]; } };
+            if (tw[i] < tw[j]) [i, j] = [j, i];
+            return { key: `m${i}${j}`, text: `${names[i]}は${names[j]}より勝ち数が多かった`, test: (p) => { const w = wins(p); return w[i] > w[j]; } };
+          default: {
+            const z = tw.includes(n - 1), y = tw.includes(0);
+            return r.chance(0.5)
+              ? { key: "Z", text: z ? "全勝したチームがあった" : "全勝したチームはなかった", test: (p) => wins(p).includes(n - 1) === z }
+              : { key: "Y", text: y ? "全敗したチームがあった" : "全敗したチームはなかった", test: (p) => wins(p).includes(0) === y };
+          }
+        }
+      };
+      const intro = `<p>${names.join("、")}の${n}チームが総当たり戦（どのチームとも1回ずつ対戦）を行った。引き分けはなく、次のことがわかっている。</p>`;
+      const show = (p) => { const w = wins(p); return names.map((x, i) => `${x} ${wl(w[i])}`).join("、"); };
+      if (!hard) {
+        const z = r.int(0, n - 1);
+        const { clues, rest } = narrowUntil(r, cands, makeClue, (rest) => rest.every((p) => wins(p)[z] === tw[z]), (c) => c.key === `r${z}`);
+        const recs = ranks(n).map((k) => n - k).map(wl);
+        const seen = [...new Set(rest.map(show))];
+        return {
+          q: `${intro}${ul(clues.map((c) => c.text))}<p>${names[z]}の成績はどれか。</p>`,
+          choices: recs, answer: recs.indexOf(wl(tw[z])),
+          explain: `<p>条件を満たす勝ち数の組み合わせは次の${seen.length}通り。</p>${ul(seen.slice(0, 4))}<p>どの場合も${names[z]}は<b>${wl(tw[z])}</b></p>`,
+        };
+      }
+      return retry(() => {
+        const { clues, rest } = narrow(r, cands, makeClue, true, 3);
+        const pool = [
+          ...games.flatMap(([a, b], k) => [[a, b], [b, a]].map(([w, l]) => ({ key: `b${k}${w}`, text: `${names[w]}は${names[l]}に勝った`, test: (p) => p[k] === w }))),
+          ...names.flatMap((x, i) => ranks(n).map((k) => k - 1).map((w) => ({ key: `r${i}${w}`, text: `${x}は${wl(w)}だった`, test: (p) => wins(p)[i] === w }))),
+          ...names.map((x, i) => ({ key: `M${i}`, text: `${x}の勝ち数が単独で最も多い`, test: (p) => { const w = wins(p); return w.every((v, z) => z === i || v < w[i]); } })),
+        ];
+        const used = new Set(clues.map((c) => c.key));
+        const st = pickStatements(r, rest, pool.filter((s) => !used.has(s.key.slice(0, -1)) && !used.has(s.key)), clues);
+        const showGames = (p) => games.map(([a, b], k) => `${names[a]}${names[b]}戦は${names[p[k]]}`).join("、");
+        return st && mustQuestion(intro, clues, st, rest, (p) => `${show(p)}（${showGames(p)}）`);
+      }, 50);
+    },
+  },
+
+  {
+    id: "heikin", name: "推論（平均）", time: [50, 100],
+    tip: "平均は合計に直して考える（合計 ＝ 平均 × 人数）。2人の和と差がわかれば和差算で求まる。",
+    gen(r, hard) {
+      const score = () => r.int(35, 98);
+      if (!hard) {
+        if (r.chance(0.5)) {
+          const [a, b, c] = retry(() => { const s = [score(), score(), score()]; return (s[0] + s[1] + s[2]) % 3 ? null : s; });
+          const m = (a + b + c) / 3;
+          return {
+            q: `P、Q、Rの3人がテストを受けた。3人の平均点は${m}点で、Pは${a}点、Qは${b}点だった。Rは何点か。`,
+            ...numChoices(r, c, [m, Math.round((a + b) / 2), 2 * m - a], { unit: "点", step: 1 }),
+            explain: `3人の合計は ${m} × 3 ＝ ${m * 3}点。R ＝ ${m * 3} − ${a} − ${b} ＝ <b>${c}点</b>`,
+            num: c, unit: "点",
+          };
+        }
+        const [p, m4, m3] = retry(() => {
+          const s = [score(), score(), score(), score()], t = s.reduce((x, y) => x + y);
+          return t % 4 || (t - s[0]) % 3 || t / 4 === (t - s[0]) / 3 ? null : [s[0], t / 4, (t - s[0]) / 3];
+        });
+        return {
+          q: `P、Q、R、Sの4人の平均点は${m4}点だった。Pを除いた3人の平均点は${m3}点である。Pは何点か。`,
+          ...numChoices(r, p, [m4 + (m4 - m3), Math.abs(m4 - m3), m4 * 4 - m3], { unit: "点", step: 1 }),
+          explain: `4人の合計は ${m4} × 4 ＝ ${m4 * 4}点、Pを除く3人の合計は ${m3} × 3 ＝ ${m3 * 3}点。P ＝ ${m4 * 4} − ${m3 * 3} ＝ <b>${p}点</b>`,
+          num: p, unit: "点",
+        };
+      }
+      if (r.chance(0.5)) {
+        const [a, b, c, d] = retry(() => {
+          const s = [score(), score(), score(), score()];
+          return s.reduce((x, y) => x + y) % 4 || (s[0] + s[1]) % 2 || s[2] <= s[3] ? null : s;
+        });
+        const m4 = (a + b + c + d) / 4, m2 = (a + b) / 2, k = c - d, rs = m4 * 4 - m2 * 2;
+        return {
+          q: `P、Q、R、Sの4人の平均点は${m4}点で、PとQの平均点は${m2}点だった。また、RはSより${k}点高かった。Sは何点か。`,
+          ...numChoices(r, d, [c, rs - k, Math.round(m4 - k / 2)], { unit: "点", step: 1 }),
+          explain: `4人の合計は ${m4} × 4 ＝ ${m4 * 4}点、PとQの合計は ${m2} × 2 ＝ ${m2 * 2}点なので、R ＋ S ＝ ${rs}点。R − S ＝ ${k}点だから、S ＝ (${rs} − ${k}) ÷ 2 ＝ <b>${d}点</b>`,
+          num: d, unit: "点",
+        };
+      }
+      const [p, q, m4, m3] = retry(() => {
+        const s = [score(), score(), score(), score()], t = s.reduce((x, y) => x + y);
+        return t % 4 || (t - s[0]) % 3 || s[1] >= s[0] ? null : [s[0], s[1], t / 4, (t - s[0]) / 3];
+      });
+      const k = p - q;
+      return {
+        q: `P、Q、R、Sの4人の平均点は${m4}点で、Pを除いた3人の平均点は${m3}点だった。また、QはPより${k}点低かった。Qは何点か。`,
+        ...numChoices(r, q, [p, p + k, m3 - k], { unit: "点", step: 1 }),
+        explain: `4人の合計 ${m4} × 4 ＝ ${m4 * 4}点から、Pを除く3人の合計 ${m3} × 3 ＝ ${m3 * 3}点を引くと P ＝ ${p}点。Q ＝ ${p} − ${k} ＝ <b>${q}点</b>`,
+        num: q, unit: "点",
+      };
     },
   },
 
