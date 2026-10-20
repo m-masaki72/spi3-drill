@@ -3,6 +3,7 @@ import { makeRng } from "./util.js";
 import { NONVERBAL } from "./nonverbal.js";
 import { VERBAL } from "./verbal.js";
 import { POINTS } from "./points.js";
+import { icon, hydrateIcons } from "./icons.js";
 
 const CATS = [...NONVERBAL.map((c) => ({ ...c, group: "非言語" })), ...VERBAL.map((c) => ({ ...c, group: "言語" }))];
 const byId = Object.fromEntries(CATS.map((c) => [c.id, c]));
@@ -13,6 +14,27 @@ const MODES = {
 };
 const TYPE_RATE = 0.35; // 本番で数値を直接入力させる割合
 const MOCK_N = 15; // 模試の1セクションの問題数（言語・非言語それぞれ）
+const GOALS = [5, 10, 20, 30];
+const BADGES = [
+  { id: "first", name: "はじめの1セット", icon: "play" },
+  { id: "perfect", name: "全問正解", icon: "star" },
+  { id: "goal", name: "1日の目標を達成", icon: "target" },
+  { id: "streak3", name: "3日連続", icon: "flame" },
+  { id: "streak7", name: "7日連続", icon: "flame" },
+  { id: "q100", name: "累計100問", icon: "check" },
+  { id: "q500", name: "累計500問", icon: "award" },
+  { id: "mock", name: "模試に挑戦", icon: "exam" },
+  { id: "allcats", name: "全分野に挑戦", icon: "book" },
+];
+const OK_MSG = ["正解！", "お見事！", "その調子！", "バッチリです！"];
+const NG_MSG = ["惜しい！", "ここで覚えましょう", "次は取れます"];
+const CHEER = {
+  s: ["素晴らしい出来です！", "本番もこの調子でいけます！"],
+  a: ["よくできました！", "あと一歩で満点圏です！"],
+  b: ["半分以上正解、いい感じです", "解説を読んで、もう1セットいきましょう"],
+  c: ["ここからが伸びどころです", "間違えた分野を見直してみましょう"],
+};
+const WEEK = "日月火水木金土";
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" })[c]);
@@ -22,6 +44,8 @@ const el = (tag, cls, html) => {
   if (html != null) e.innerHTML = html;
   return e;
 };
+const pick = (a) => a[Math.floor(Math.random() * a.length)];
+const gk = (c) => (c.group === "言語" ? "v" : "nv");
 
 // ---- 保存（使えない環境でも動くようにすべて try/catch） ----
 const store = {
@@ -32,14 +56,32 @@ const store = {
     try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* 保存できなくても続ける */ }
   },
 };
+const obj = (v) => (v && typeof v === "object" && !Array.isArray(v) ? v : {});
 
 let mode = store.get("spi3Mode", "easy");
 if (!MODES[mode]) mode = "easy";
 let count = store.get("spi3Count", 10);
 if (![5, 10, 20].includes(count)) count = 10;
-let stats = store.get("spi3Stats", {});
+let goal = store.get("spi3Goal", 10);
+if (!GOALS.includes(goal)) goal = 10;
+let group = store.get("spi3Group", "nv") === "v" ? "v" : "nv";
+let stats = obj(store.get("spi3Stats", {}));
 let mocks = store.get("spi3Mock", []);
 if (!Array.isArray(mocks)) mocks = [];
+let days = obj(store.get("spi3Days", {})); // { "YYYY-MM-DD": その日に解いた問題数 }（直近60日）
+let best = obj(store.get("spi3Best", {})); // 条件ごとの最高正答率
+let streakBest = store.get("spi3StreakBest", 0);
+let badges = store.get("spi3Badges", []);
+if (!Array.isArray(badges)) badges = [];
+
+const dayKey = (t = new Date()) => `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+function streak() {
+  const d = new Date();
+  if (!days[dayKey(d)]) d.setDate(d.getDate() - 1); // 今日まだ解いていなくても、昨日までの連続は切らない
+  let n = 0;
+  while (days[dayKey(d)]) { n++; d.setDate(d.getDate() - 1); }
+  return n;
+}
 
 const statOf = (m, id) => stats[m]?.[id] ?? { n: 0, ok: 0, sec: 0 };
 function record(id, ok, sec, m) {
@@ -47,9 +89,17 @@ function record(id, ok, sec, m) {
   const s = statOf(m, id);
   stats[m][id] = { n: s.n + 1, ok: s.ok + (ok ? 1 : 0), sec: s.sec + sec };
   store.set("spi3Stats", stats);
+  const k = dayKey();
+  days[k] = (days[k] ?? 0) + 1;
+  for (const old of Object.keys(days).sort().slice(0, -60)) delete days[old];
+  store.set("spi3Days", days);
+  const st = streak();
+  if (st > streakBest) { streakBest = st; store.set("spi3StreakBest", st); }
 }
 const pct = (ok, n) => Math.round((ok / n) * 100);
 const mmss = (sec) => `${Math.floor(sec / 60)}分${String(Math.floor(sec % 60)).padStart(2, "0")}秒`;
+const avgTime = (ids, m) => ids.reduce((a, id) => a + byId[id].time[m === "exam" ? 1 : 0], 0) / ids.length;
+const groupIds = (g) => CATS.filter((c) => c.group === g).map((c) => c.id);
 
 function show(id) {
   for (const s of ["home", "quiz", "result"]) $(`#${s}`).hidden = s !== id;
@@ -62,46 +112,103 @@ const pointsList = (id) => `<ul>${(POINTS[id] ?? []).map((p) => `<li>${p}</li>`)
 const pointsHtml = (id) => (POINTS[id] ? `<details class="pts"><summary>公式・ポイント</summary>${pointsList(id)}</details>` : "");
 
 // ---- ホーム ----
+function renderHero() {
+  const today = days[dayKey()] ?? 0, st = streak();
+  $("#h-streak").textContent = st;
+  $("#h-streak").closest(".hs").classList.toggle("streak-on", st > 0);
+  $("#h-today").textContent = today;
+  $("#h-goal").textContent = `${Math.min(today, goal)}/${goal}`;
+  $("#h-goal").closest(".hs").classList.toggle("done", today >= goal);
+  $("#h-ring").setAttribute("stroke-dashoffset", 100 - Math.min(100, (today / goal) * 100));
+  const d = new Date();
+  d.setDate(d.getDate() - 6);
+  const cells = [];
+  for (let k = 0; k < 7; k++) {
+    const on = !!days[dayKey(d)];
+    cells.push(el("span", `${on ? "on" : ""}${k === 6 ? " today" : ""}`, `<i>${on ? icon("check") : ""}</i>${k === 6 ? "今日" : WEEK[d.getDay()]}`));
+    d.setDate(d.getDate() + 1);
+  }
+  $("#h-week").replaceChildren(...cells);
+  document.querySelectorAll("#goal-seg [data-goal]").forEach((b) => b.setAttribute("aria-pressed", +b.dataset.goal === goal));
+}
+
 function renderHome() {
-  document.querySelectorAll("[data-mode]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.mode === mode));
+  document.body.dataset.mode = mode;
+  document.querySelectorAll("#modesw [data-mode]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.mode === mode));
+  $("#modesw").dataset.active = mode;
   document.querySelectorAll("[data-count]").forEach((b) => b.setAttribute("aria-pressed", +b.dataset.count === count));
   $("#mode-desc").textContent = MODES[mode].desc;
+  $("#mix-eta").textContent = `${count}問・目安${Math.max(1, Math.round((avgTime(CATS.map((c) => c.id), mode) * count) / 60))}分`;
+  $("#mock-time").textContent = `約${Math.round((avgTime(groupIds("言語"), "exam") * MOCK_N + avgTime(groupIds("非言語"), "exam") * MOCK_N) / 60)}分`;
   for (const g of ["非言語", "言語"]) {
     const box = $(g === "言語" ? "#cats-verbal" : "#cats-nonverbal");
     box.replaceChildren(...CATS.filter((c) => c.group === g).map((c) => {
-      const s = statOf(mode, c.id);
-      const b = el("button", "cat");
+      const s = statOf(mode, c.id), p = s.n ? pct(s.ok, s.n) : 0;
+      const [lc, lt] = !s.n ? ["", "未挑戦"] : s.n < 5 ? ["", "練習中"] : p >= 80 ? ["good", "得意"] : p >= 50 ? ["mid", "あと少し"] : ["low", "要復習"];
+      const b = el("button", "cat", `<span class="cat-ico">${icon(c.id)}</span><span class="cat-name">${c.name}</span><span class="cat-stat"><span class="lv ${lc}">${lt}</span>${s.n ? `${s.n}問` : ""}</span><span class="cat-ring"><span>${s.n ? `${p}%` : "—"}</span></span><span class="cat-tip">${c.tip}</span>`);
       b.type = "button";
-      b.innerHTML = `<span class="cat-name">${c.name}</span><span class="cat-stat">${s.n ? `${s.n}問・正答率${Math.round((s.ok / s.n) * 100)}%` : "未挑戦"}</span><span class="cat-tip">${c.tip}</span>`;
+      b.dataset.group = gk(c);
+      b.style.setProperty("--p", p); // CSP で style 属性は使えないので JS で入れる
       b.addEventListener("click", () => start({ ids: [c.id], label: c.name }));
       return b;
     }));
   }
-  $("#points-all").innerHTML = CATS.map((c) => `<details class="pts"><summary>${c.group}｜${c.name}</summary>${pointsList(c.id)}</details>`).join("");
+  renderTabs();
   const total = Object.values(stats[mode] ?? {}).reduce((a, s) => ({ n: a.n + s.n, ok: a.ok + s.ok }), { n: 0, ok: 0 });
-  $("#home-total").textContent = total.n ? `${MODES[mode].name}モードの記録：${total.n}問・正答率${Math.round((total.ok / total.n) * 100)}%` : "";
+  $("#home-total").textContent = total.n ? `${MODES[mode].name}モードの記録：${total.n}問・正答率${pct(total.ok, total.n)}%` : "";
+  renderHero();
   renderWeak();
   renderMockLast();
+  renderBadges();
 }
 
-// 苦手分析：挑戦した分野を正答率の低い順に並べる
+function renderTabs() {
+  document.querySelectorAll("[data-gtab]").forEach((b) => b.setAttribute("aria-selected", b.dataset.gtab === group));
+  $("#cats-nonverbal").hidden = group !== "nv";
+  $("#cats-verbal").hidden = group !== "v";
+}
+
+function renderPoints() {
+  $("#points-all").innerHTML = ["非言語", "言語"].map((g) => `<div data-group="${gk({ group: g })}"><h3>${icon(g === "言語" ? "text" : "calc")}${g}</h3>${CATS.filter((c) => c.group === g)
+    .map((c) => `<details class="pts"><summary>${icon(c.id)}${c.name}</summary>${pointsList(c.id)}</details>`).join("")}</div>`).join("");
+}
+
+// 苦手分析：挑戦した分野を正答率の低い順（または目安時間に対して遅い順）に並べる
+let weakSort = "acc";
 function renderWeak() {
-  const rows = CATS.map((c) => ({ c, s: statOf(mode, c.id) })).filter((x) => x.s.n > 0)
-    .sort((a, b) => a.s.ok / a.s.n - b.s.ok / b.s.n || b.s.n - a.s.n).slice(0, 6);
-  $("#weak-card").hidden = rows.length === 0;
-  if (!rows.length) return;
-  const exam = mode === "exam";
-  $("#weak-desc").textContent = `${MODES[mode].name}モードの記録から、正答率の低い分野を表示しています。押すとその分野を練習できます。`;
-  $("#weak-list").replaceChildren(...rows.map(({ c, s }) => {
-    const p = pct(s.ok, s.n), avg = Math.round(s.sec / s.n), target = c.time[exam ? 1 : 0];
-    const b = el("button", "weak-row", `<span class="name">${c.group}・${c.name}</span><span class="pct">${p}%</span><span class="meter"><div></div></span><span class="info">${s.n}問・平均${avg}秒（${exam ? "制限" : "目安"}${target}秒）${avg > target ? "・時間オーバー気味" : ""}</span>`);
+  const exam = mode === "exam", ti = exam ? 1 : 0;
+  const tried = CATS.map((c) => ({ c, s: statOf(mode, c.id) })).filter((x) => x.s.n > 0);
+  $("#weak-card").hidden = tried.length === 0;
+  if (!tried.length) return;
+  const tot = tried.reduce((a, { s }) => ({ n: a.n + s.n, ok: a.ok + s.ok }), { n: 0, ok: 0 });
+  $("#weak-kpis").innerHTML = `<div><b>${tot.n}</b><span>解いた問題</span></div><div><b>${pct(tot.ok, tot.n)}%</b><span>正答率</span></div><div><b>${tried.length}/${CATS.length}</b><span>挑戦した分野</span></div>`;
+  document.querySelectorAll("#weak-sort [data-sort]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.sort === weakSort));
+  const slow = (x) => x.s.sec / x.s.n / x.c.time[ti];
+  const rows = [...tried].sort(weakSort === "acc"
+    ? (a, b) => a.s.ok / a.s.n - b.s.ok / b.s.n || b.s.n - a.s.n
+    : (a, b) => slow(b) - slow(a)).slice(0, 6);
+  $("#weak-desc").textContent = `${MODES[mode].name}モードの記録から${weakSort === "acc" ? "正答率の低い" : `${exam ? "制限" : "目安"}時間に対して時間のかかっている`}分野を表示しています。押すとその分野を練習できます。`;
+  $("#weak-list").replaceChildren(...rows.map((x) => {
+    const { c, s } = x;
+    const p = pct(s.ok, s.n), avg = Math.round(s.sec / s.n), target = c.time[ti], r = slow(x);
+    const b = el("button", "weak-row", `${icon(c.id)}<span class="name">${c.group}・${c.name}</span><span class="pct">${weakSort === "acc" ? `${p}%` : `${avg}秒`}</span><span class="meter"><div></div></span><span class="info">${s.n}問・正答率${p}%・平均${avg}秒（${exam ? "制限" : "目安"}${target}秒）${avg > target ? '<span class="slow">・時間オーバー気味</span>' : ""}</span>`);
     b.type = "button";
+    b.dataset.group = gk(c);
     const bar = b.querySelector(".meter > div");
-    bar.style.width = `${Math.max(p, 2)}%`; // CSP で style 属性は使えないので JS で幅を入れる
-    if (p < 50) bar.classList.add("low"); else if (p < 75) bar.classList.add("mid");
+    if (weakSort === "acc") {
+      bar.style.setProperty("--p", Math.max(p, 2));
+      if (p < 50) bar.classList.add("low"); else if (p < 75) bar.classList.add("mid");
+    } else {
+      bar.style.setProperty("--p", Math.min(100, Math.max(2, r * 100)));
+      if (r > 1) bar.classList.add("low"); else if (r > 0.8) bar.classList.add("mid");
+    }
     b.addEventListener("click", () => start({ ids: [c.id], label: c.name }));
     return b;
   }));
+  $("#weak-all").innerHTML = `<table><thead><tr><th>分野</th><th>問題数</th><th>正答率</th><th>平均</th></tr></thead><tbody>${CATS.map((c) => {
+    const s = statOf(mode, c.id);
+    return `<tr><td>${c.group}・${c.name}</td><td>${s.n || "—"}</td><td>${s.n ? `${pct(s.ok, s.n)}%` : "—"}</td><td>${s.n ? `${Math.round(s.sec / s.n)}秒` : "—"}</td></tr>`;
+  }).join("")}</tbody></table>`;
 }
 
 function renderMockLast() {
@@ -109,12 +216,38 @@ function renderMockLast() {
   if (!last) { $("#mock-last").textContent = ""; return; }
   const sum = (m) => m.s.reduce((a, [ok]) => a + ok, 0);
   const n = last.s.reduce((a, [, k]) => a + k, 0);
-  const best = Math.max(...mocks.map(sum));
+  const top = Math.max(...mocks.map(sum));
   const d = new Date(last.d);
-  $("#mock-last").textContent = `前回（${d.getMonth() + 1}/${d.getDate()}）：${sum(last)} / ${n}問（言語${last.s[0][0]}・非言語${last.s[1][0]}）　最高：${best}問`;
+  $("#mock-last").textContent = `前回（${d.getMonth() + 1}/${d.getDate()}）：${sum(last)} / ${n}問（言語${last.s[0][0]}・非言語${last.s[1][0]}）　最高：${top}問`;
 }
 
-document.querySelectorAll("[data-mode]").forEach((b) => b.addEventListener("click", () => {
+const badgeHtml = (b, got) => `<span class="bdg${got ? " got" : ""}">${icon(b.icon)}${b.name}</span>`;
+function renderBadges() {
+  $("#badge-card").hidden = badges.length === 0;
+  $("#badge-count").textContent = `${badges.length} / ${BADGES.length}`;
+  $("#badge-list").innerHTML = BADGES.map((b) => badgeHtml(b, badges.includes(b.id))).join("");
+}
+
+// 結果のたびに条件を満たしたバッジを足し、新しく取れたものを返す
+function checkBadges(ok, n, mock) {
+  const got = new Set(badges), add = [];
+  const give = (id, cond) => { if (cond && !got.has(id)) { got.add(id); add.push(id); } };
+  const all = Object.values(stats).flatMap((m) => Object.values(m));
+  const totalN = all.reduce((a, s) => a + s.n, 0);
+  give("first", true);
+  give("perfect", n >= 5 && ok === n);
+  give("goal", (days[dayKey()] ?? 0) >= goal);
+  give("streak3", streak() >= 3);
+  give("streak7", streak() >= 7);
+  give("q100", totalN >= 100);
+  give("q500", totalN >= 500);
+  give("mock", mock);
+  give("allcats", CATS.every((c) => statOf("easy", c.id).n + statOf("exam", c.id).n > 0));
+  if (add.length) { badges = BADGES.map((b) => b.id).filter((id) => got.has(id)); store.set("spi3Badges", badges); }
+  return add;
+}
+
+document.querySelectorAll("#modesw [data-mode]").forEach((b) => b.addEventListener("click", () => {
   mode = b.dataset.mode;
   store.set("spi3Mode", mode);
   renderHome();
@@ -124,6 +257,20 @@ document.querySelectorAll("[data-count]").forEach((b) => b.addEventListener("cli
   store.set("spi3Count", count);
   renderHome();
 }));
+document.querySelectorAll("#goal-seg [data-goal]").forEach((b) => b.addEventListener("click", () => {
+  goal = +b.dataset.goal;
+  store.set("spi3Goal", goal);
+  renderHero();
+}));
+document.querySelectorAll("[data-gtab]").forEach((b) => b.addEventListener("click", () => {
+  group = b.dataset.gtab;
+  store.set("spi3Group", group);
+  renderTabs();
+}));
+document.querySelectorAll("#weak-sort [data-sort]").forEach((b) => b.addEventListener("click", () => {
+  weakSort = b.dataset.sort;
+  renderWeak();
+}));
 document.querySelectorAll("[data-mix]").forEach((b) => b.addEventListener("click", () => {
   const mix = b.dataset.mix;
   if (mix === "weak") return start({ ids: CATS.map((c) => c.id), weak: true, label: "苦手な分野から" });
@@ -131,26 +278,28 @@ document.querySelectorAll("[data-mix]").forEach((b) => b.addEventListener("click
   start({ ids, label: mix === "all" ? "全分野ミックス" : `${mix}ミックス` });
 }));
 $("#mock-start").addEventListener("click", () => start({ mock: true, label: "模試" }));
-// 2回押しで確定するボタン。1回目は文言を変えて待ち、時間が過ぎたら元に戻す
+// 2回押しで確定するボタン。1回目は文言を変えて待ち、時間が過ぎたら元に戻す（アイコンを残すため文言は .lbl に入れる）
 function confirmTwice(b, ask, idle, ms) {
+  const t = b.querySelector(".lbl") ?? b;
   clearTimeout(b._t);
   if (b.dataset.armed !== "1") {
     b.dataset.armed = "1";
-    b.textContent = ask;
-    b._t = setTimeout(() => { b.dataset.armed = ""; b.textContent = idle; }, ms);
+    t.textContent = ask;
+    b._t = setTimeout(() => { b.dataset.armed = ""; t.textContent = idle; }, ms);
     return false;
   }
   b.dataset.armed = "";
-  b.textContent = idle;
+  t.textContent = idle;
   return true;
 }
 
+// 記録（正答率・模試・練習した日・最高記録・バッジ）を消す。モードや目標などの設定は残す
 $("#reset-stats").addEventListener("click", () => {
   const b = $("#reset-stats");
   if (!confirmTwice(b, "もう一度押すと記録を消します", "記録を消す", 4000)) return;
-  stats = {};
-  store.set("spi3Stats", stats);
-  b.textContent = "記録を消しました";
+  stats = {}; mocks = []; days = {}; best = {}; streakBest = 0; badges = [];
+  for (const [k, v] of [["spi3Stats", stats], ["spi3Mock", mocks], ["spi3Days", days], ["spi3Best", best], ["spi3StreakBest", 0], ["spi3Badges", badges]]) store.set(k, v);
+  b.querySelector(".lbl").textContent = "記録を消しました";
   renderHome();
 });
 
@@ -179,7 +328,6 @@ function start(opts) {
   const m = opts.mock ? "exam" : mode;
   const hard = m === "exam";
   const seen = new Set();
-  const groupIds = (g) => CATS.filter((c) => c.group === g).map((c) => c.id);
   const ids = opts.mock
     ? [...pickIds(groupIds("言語"), false, MOCK_N), ...pickIds(groupIds("非言語"), false, MOCK_N)]
     : pickIds(opts.ids, opts.weak, count);
@@ -194,7 +342,7 @@ function start(opts) {
     const typed = hard && q.num != null && Math.random() < TYPE_RATE;
     return { ...q, cat, typed, pick: null, input: "", ok: false, sec: 0 };
   });
-  quiz = { opts, mode: m, hard, qs, i: 0, quit: false };
+  quiz = { opts, mode: m, hard, qs, i: 0, quit: false, combo: 0 };
   // 模試の時間はセクション（言語・非言語）ごと。各問の制限時間の合計を持ち時間にする
   if (opts.mock) {
     quiz.sections = ["言語", "非言語"].map((g) => {
@@ -203,6 +351,7 @@ function start(opts) {
     });
   }
   document.body.classList.toggle("exam", hard);
+  $("#q-combo").hidden = true;
   show("quiz");
   renderQuestion();
 }
@@ -224,6 +373,17 @@ function timeUp(part) {
   advance(true);
 }
 
+// 進み具合の点（模試は今のセクションの分だけ）。お手軽は正誤の色、本番は答えたかどうかだけ
+function renderDots() {
+  const { qs, i, hard } = quiz;
+  const part = sectionOf(i);
+  const [from, to] = part ? [part.from, part.to] : [0, qs.length - 1];
+  $("#q-dots").replaceChildren(...qs.slice(from, to + 1).map((q, k) => {
+    const j = from + k;
+    return el("i", j === i ? "cur" : !q.done ? "" : hard ? "done" : q.ok ? "ok" : "ng");
+  }));
+}
+
 function renderQuestion() {
   const { qs, i, hard } = quiz;
   const q = qs[i];
@@ -231,10 +391,13 @@ function renderQuestion() {
   const limit = part ? part.limit : q.cat.time[1];
   if (part && !part.end) part.end = performance.now() + part.limit * 1000;
   $("#q-progress").textContent = part ? `${part.name} ${i - part.from + 1} / ${part.to - part.from + 1}` : `${i + 1} / ${qs.length}`;
-  $("#q-cat").textContent = `${q.cat.group}・${q.cat.name}`;
+  const chip = $("#q-cat");
+  chip.dataset.group = gk(q.cat);
+  chip.innerHTML = `${icon(q.cat.id)}${q.cat.group}・${q.cat.name}`;
   $("#q-body").innerHTML = q.q;
   $("#q-explain").hidden = true;
   $("#q-explain").innerHTML = "";
+  renderDots();
   const next = $("#q-next");
   next.textContent = i === qs.length - 1 ? "結果を見る" : "次へ";
   next.disabled = hard;
@@ -262,26 +425,29 @@ function renderQuestion() {
   t0 = performance.now();
   clearInterval(timer);
   const bar = $("#q-bar"), tm = $("#q-time");
+  tm.innerHTML = `${icon("clock")}<span></span>`;
+  const out = tm.lastElementChild;
+  const state = (warn, hot) => { tm.classList.toggle("warn", warn && !hot); tm.classList.toggle("hot", hot); bar.classList.toggle("warn", warn || hot); };
   const tick = () => {
     if (part) {
       const left = Math.max(0, (part.end - performance.now()) / 1000);
-      tm.textContent = `残り${mmss(Math.ceil(left))}`;
+      out.textContent = `残り${mmss(Math.ceil(left))}`;
       bar.style.width = `${(left / limit) * 100}%`;
-      bar.classList.toggle("warn", left < 60);
+      state(left < 180, left < 60);
       if (left <= 0) timeUp(part);
       return;
     }
     const sec = (performance.now() - t0) / 1000;
     if (hard) {
       const left = Math.max(0, limit - sec);
-      tm.textContent = `残り${Math.ceil(left)}秒`;
+      out.textContent = `残り${Math.ceil(left)}秒`;
       bar.style.width = `${(left / limit) * 100}%`;
-      bar.classList.toggle("warn", left < 10);
+      state(left < limit * 0.3, left < 10);
       if (left <= 0) advance(true);
     } else {
-      tm.textContent = `${Math.floor(sec)}秒（目安${q.cat.time[0]}秒）`;
+      out.textContent = `${Math.floor(sec)}秒（目安${q.cat.time[0]}秒）`;
       bar.style.width = `${Math.min(100, (sec / q.cat.time[0]) * 100)}%`;
-      bar.classList.toggle("warn", sec > q.cat.time[0]);
+      state(sec > q.cat.time[0], false);
     }
   };
   tick();
@@ -306,8 +472,17 @@ function choose(k) {
     if (j === q.answer) b.classList.add("right");
     else if (j === k) b.classList.add("wrong");
   });
+  quiz.combo = q.ok ? quiz.combo + 1 : 0;
+  const combo = $("#q-combo");
+  combo.hidden = quiz.combo < 2;
+  if (quiz.combo >= 2) combo.innerHTML = `${icon("flame")}${quiz.combo}連続正解`;
+  renderDots();
   const ex = $("#q-explain");
-  ex.innerHTML = `<p class="verdict ${q.ok ? "ok" : "ng"}">${q.ok ? "正解！" : `不正解… 正解は ${LETTERS[q.answer]}`}</p><div>${q.explain}</div><p class="tip"><b>コツ</b>${q.cat.tip}</p>${pointsHtml(q.cat.id)}`;
+  ex.className = q.ok ? "ok" : "ng";
+  const verdict = q.ok
+    ? `<p class="verdict ok">${icon("check")}${quiz.combo >= 3 ? `${quiz.combo}問連続で正解！` : pick(OK_MSG)}</p>`
+    : `<p class="verdict ng">${icon("x")}${pick(NG_MSG)}<small>正解は ${LETTERS[q.answer]}</small></p>`;
+  ex.innerHTML = `${verdict}<div>${q.explain}</div><p class="tip"><b>コツ</b>${q.cat.tip}</p>${pointsHtml(q.cat.id)}`;
   ex.hidden = false;
   const next = $("#q-next");
   next.hidden = false;
@@ -336,7 +511,8 @@ function finishQ(q, timeout = false) {
 
 function advance(timeout = false) {
   const q = quiz.qs[quiz.i];
-  finishQ(q, timeout);  if (quiz.i < quiz.qs.length - 1) {
+  finishQ(q, timeout);
+  if (quiz.i < quiz.qs.length - 1) {
     quiz.i++;
     renderQuestion();
   } else {
@@ -360,8 +536,16 @@ function renderResult() {
   clearInterval(timer);
   const { qs, opts, sections } = quiz;
   const ok = qs.filter((q) => q.ok).length;
+  const rate = pct(ok, qs.length);
   const avg = Math.round(qs.reduce((a, q) => a + q.sec, 0) / qs.length);
-  $("#r-score").innerHTML = `<b>${ok}</b> / ${qs.length}問 正解`;
+  const tier = rate >= 90 ? "s" : rate >= 70 ? "a" : rate >= 50 ? "b" : "c";
+  $("#r-top").dataset.tier = tier;
+  $("#r-pct").textContent = `${rate}%`;
+  $("#r-score").textContent = `${ok} / ${qs.length}問 正解`;
+  const ring = $("#r-ring");
+  ring.setAttribute("stroke-dashoffset", 100);
+  requestAnimationFrame(() => requestAnimationFrame(() => ring.setAttribute("stroke-dashoffset", 100 - rate)));
+  $("#r-cheer").textContent = ok === qs.length && qs.length >= 5 ? "全問正解！ お見事です" : pick(CHEER[tier]);
   $("#r-meta").textContent = opts.mock ? `模試（本番形式）・1問あたり平均${avg}秒` : `${MODES[quiz.mode].name}モード・${opts.label}・1問あたり平均${avg}秒`;
 
   // 模試はセクションごとの成績を出して履歴に残す
@@ -370,13 +554,28 @@ function renderResult() {
     return { name: s.name, ok: list.filter((q) => q.ok).length, n: list.length, sec: list.reduce((a, q) => a + q.sec, 0), limit: s.limit, left: list.filter((q) => q.skipped).length };
   });
   $("#r-sections").hidden = !parts;
-  if (parts) {
-    $("#r-sections").innerHTML = parts.map((p) => `<div><span>${p.name}</span><b>${p.ok} / ${p.n}</b><span>${pct(p.ok, p.n)}%・${mmss(p.sec)} / ${mmss(p.limit)}${p.left ? `・未着手${p.left}問` : ""}</span></div>`).join("");
-    if (!quiz.saved) {
-      quiz.saved = true;
+  if (parts) $("#r-sections").innerHTML = parts.map((p) => `<div><span>${p.name}</span><b>${p.ok} / ${p.n}</b><span>${pct(p.ok, p.n)}%・${mmss(p.sec)} / ${mmss(p.limit)}${p.left ? `・未着手${p.left}問` : ""}</span></div>`).join("");
+
+  // 履歴・最高記録・バッジは1回の結果につき1度だけ更新する
+  const bestBox = $("#r-best");
+  if (!quiz.saved) {
+    quiz.saved = true;
+    if (parts) {
       mocks = [...mocks, { d: Date.now(), s: parts.map((p) => [p.ok, p.n, p.sec]) }].slice(-20);
       store.set("spi3Mock", mocks);
     }
+    bestBox.hidden = true;
+    if (!opts.mock && !quiz.quit && qs.length >= 5) {
+      const key = `${quiz.mode}|${opts.label}|${qs.length}`, prev = best[key];
+      if (prev == null || rate > prev) { best[key] = rate; store.set("spi3Best", best); }
+      if (prev != null) {
+        bestBox.textContent = rate > prev ? `自己ベスト更新！（これまでの最高 ${prev}%）` : `この条件での最高 ${prev}%`;
+        bestBox.hidden = false;
+      }
+    }
+    const add = checkBadges(ok, qs.length, !!parts);
+    $("#r-badges").hidden = add.length === 0;
+    $("#r-badges").innerHTML = add.length ? `${BADGES.filter((b) => add.includes(b.id)).map((b) => badgeHtml(b, true)).join("")}` : "";
   }
 
   const per = {};
@@ -398,7 +597,8 @@ function renderResult() {
       ${q.typed ? "" : `<ol class="rev-choices">${q.choices.map((c, k) => `<li class="${k === q.answer ? "right" : k === q.pick ? "wrong" : ""}"><span class="key">${LETTERS[k]}</span>${c}</li>`).join("")}</ol>`}
       <p class="rev-ans">あなたの答え：${yours}<br>正解：<b>${right}</b></p><div class="rev-ex">${q.explain}</div><p class="tip"><b>コツ</b>${q.cat.tip}</p>${pointsHtml(q.cat.id)}</div>`;
     return d;
-  }));
+  }), el("p", "rev-empty", "間違えた問題はありません。"));
+  revFilter("all");
 
   const missIds = Object.values(per).filter((p) => p.ok < p.n).map((p) => p.cat.id);
   const retryMiss = $("#r-miss");
@@ -412,6 +612,15 @@ function renderResult() {
   $("#r-share").href = `https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(location.origin + location.pathname)}`;
   show("result");
 }
+
+// 見直しの絞り込み（すべて／間違えた問題だけ）
+function revFilter(f) {
+  document.querySelectorAll("#rev-filter [data-f]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.f === f));
+  const list = [...document.querySelectorAll("#r-review .rev")];
+  list.forEach((d) => { d.hidden = f === "ng" && d.classList.contains("ok"); });
+  $("#r-review .rev-empty").hidden = !(f === "ng" && list.every((d) => d.hidden));
+}
+document.querySelectorAll("#rev-filter [data-f]").forEach((b) => b.addEventListener("click", () => revFilter(b.dataset.f)));
 
 $("#r-home").addEventListener("click", () => { show("home"); renderHome(); });
 
@@ -558,6 +767,8 @@ window.addEventListener("appinstalled", () => { $("#install").hidden = true; });
 
 // ---- 起動 ----
 document.querySelector("#year").textContent = new Date().getFullYear();
+hydrateIcons();
+renderPoints();
 renderHome();
 show("home");
 if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {

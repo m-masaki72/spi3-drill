@@ -1,11 +1,12 @@
 // オフライン対応用 Service Worker
 // アプリ本体を更新したら CACHE のバージョンを上げる
-const CACHE = "spi3-drill-v4";
+const CACHE = "spi3-drill-v5";
 const ASSETS = [
   "./",
   "index.html",
   "css/app.css",
   "js/app.js",
+  "js/icons.js",
   "js/util.js",
   "js/nonverbal.js",
   "js/verbal.js",

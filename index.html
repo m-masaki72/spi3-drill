@@ -7,8 +7,8 @@
 <title>SPI3ドリル（非公式） | 非言語・言語の練習問題が無限に解ける無料Webアプリ</title>
 <meta name="description" content="SPI3の非言語（割合・損益算・速さ・確率・推論・表の読み取りなど19分野）と言語（二語の関係・熟語・語句の用法・長文など9分野）の練習問題を、毎回自動で作って出題する無料のWebアプリ。お手軽モードと、制限時間・メモ・電卓つきの本番モードがあります。登録不要、オフラインでも使えます。">
 <link rel="canonical" href="https://spi3.morilab-garage.com/">
-<meta name="theme-color" content="#f6f5f1" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#15171b" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F4F6FB" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#12141A" media="(prefers-color-scheme: dark)">
 <meta name="color-scheme" content="light dark">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -86,37 +86,80 @@
 </script>
 <link rel="stylesheet" href="css/app.css">
 </head>
-<body data-screen="home">
+<body data-screen="home" data-mode="easy">
 <div class="wrap">
-  <header class="site">
-    <h1>SPI3ドリル<small>（非公式）</small></h1>
-    <p>非言語・言語の練習問題を、毎回その場で作って出題します。</p>
+  <header class="site hero">
+    <svg class="hero-deco" viewBox="0 0 240 160" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="150" y="18" width="62" height="86" rx="9"/>
+      <rect x="160" y="28" width="42" height="16" rx="3"/>
+      <path d="M163 56h6M178 56h6M193 56h6M163 70h6M178 70h6M193 70h6M163 84h6M178 84h6M193 84h6"/>
+      <path d="M40 136V96M62 136V80M84 136V104M106 136V64"/>
+      <path d="M28 136h92"/>
+      <path d="M36 88l26-18 22 16 26-34" stroke-dasharray="3 5"/>
+      <path d="M128 140l40-40 10 10-40 40h-10z"/>
+      <path d="M160 108l10 10"/>
+      <circle cx="226" cy="132" r="9"/>
+      <path d="M12 30l10 10M22 30L12 40"/>
+      <path d="M118 22h12M124 16v12"/>
+    </svg>
+    <div class="brand">
+      <img src="icons/icon.svg" alt="" width="40" height="40">
+      <div>
+        <h1>SPI3ドリル<small>（非公式）</small></h1>
+        <p>非言語・言語の練習問題を、毎回その場で作って出題します。</p>
+      </div>
+    </div>
+    <div class="hstats">
+      <div class="hs">
+        <span class="hs-ico" data-icon="flame"></span>
+        <b id="h-streak">0</b><span class="hs-unit">日</span>
+        <span class="hs-label">連続で練習</span>
+      </div>
+      <div class="hs">
+        <span class="hs-ico" data-icon="check"></span>
+        <b id="h-today">0</b><span class="hs-unit">問</span>
+        <span class="hs-label">今日解いた問題</span>
+      </div>
+      <div class="hs goal">
+        <svg class="ring" viewBox="0 0 44 44" aria-hidden="true">
+          <circle class="trk" cx="22" cy="22" r="18"/>
+          <circle class="val" id="h-ring" cx="22" cy="22" r="18" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"/>
+        </svg>
+        <b id="h-goal">0/10</b>
+        <span class="hs-label">今日の目標</span>
+      </div>
+    </div>
+    <div class="week" id="h-week" aria-label="この7日間の練習"></div>
+    <details class="goalset">
+      <summary>1日の目標を変える</summary>
+      <div class="seg" id="goal-seg">
+        <button type="button" data-goal="5" aria-pressed="false">5問</button>
+        <button type="button" data-goal="10" aria-pressed="true">10問</button>
+        <button type="button" data-goal="20" aria-pressed="false">20問</button>
+        <button type="button" data-goal="30" aria-pressed="false">30問</button>
+      </div>
+    </details>
   </header>
 
   <main>
     <!-- ホーム -->
     <section id="home">
       <section class="card install" id="install" hidden>
+        <span class="install-ico" data-icon="download"></span>
         <div>
           <b>ホーム画面に追加</b>
           <p class="sub" id="install-desc">アプリのように開けて、電波のない場所でも練習できます。</p>
         </div>
         <button type="button" class="btn primary" id="install-btn">追加する</button>
-        <button type="button" class="btn small" id="install-close" aria-label="閉じる">×</button>
+        <button type="button" class="btn small icon-only" id="install-close" aria-label="閉じる" data-icon="x"></button>
       </section>
 
-      <section class="card">
-        <h2>模試</h2>
-        <p class="desc">言語15問 → 非言語15問を、分野をまぜて本番形式で解きます。時間は言語・非言語それぞれの合計で、残り時間がなくなると次へ進みます。</p>
-        <div class="btns"><button type="button" class="btn primary" id="mock-start">模試をはじめる</button></div>
-        <p class="total" id="mock-last"></p>
-      </section>
-
-      <section class="card">
-        <h2>モード</h2>
-        <div class="seg mode">
-          <button type="button" data-mode="easy" aria-pressed="true">お手軽</button>
-          <button type="button" data-mode="exam" aria-pressed="false">本番</button>
+      <section class="card today">
+        <h2 data-icon="target">今日の1セット</h2>
+        <div class="modesw" id="modesw" data-active="easy">
+          <span class="thumb" aria-hidden="true"></span>
+          <button type="button" data-mode="easy" aria-pressed="true"><b>お手軽</b><small>時間制限なし・すぐ解説</small></button>
+          <button type="button" data-mode="exam" aria-pressed="false"><b>本番</b><small>制限時間・メモ・電卓</small></button>
         </div>
         <p class="desc" id="mode-desc"></p>
         <div class="row">
@@ -127,35 +170,70 @@
             <button type="button" data-count="20" aria-pressed="false">20問</button>
           </div>
         </div>
-      </section>
-
-      <section class="card">
-        <h2>まとめて解く</h2>
-        <div class="mix">
-          <button type="button" class="btn primary" data-mix="all">全分野ミックス</button>
-          <button type="button" class="btn" data-mix="非言語">非言語だけ</button>
-          <button type="button" class="btn" data-mix="言語">言語だけ</button>
-          <button type="button" class="btn" data-mix="weak">苦手な分野から</button>
+        <button type="button" class="hero-cta" data-mix="all">
+          <span class="cta-ico" data-icon="play"></span>
+          <span class="cta-txt"><b>全分野ミックスではじめる</b><small id="mix-eta"></small></span>
+          <span class="cta-arrow" data-icon="arrow"></span>
+        </button>
+        <div class="tiles">
+          <button type="button" class="tile" data-mix="非言語" data-group="nv"><span data-icon="calc"></span><b>非言語だけ</b><small>19分野</small></button>
+          <button type="button" class="tile" data-mix="言語" data-group="v"><span data-icon="text"></span><b>言語だけ</b><small>9分野</small></button>
+          <button type="button" class="tile weak" data-mix="weak"><span data-icon="bolt"></span><b>苦手から</b><small>正答率の低い分野を多めに</small></button>
         </div>
         <p class="total" id="home-total"></p>
       </section>
 
+      <section class="card mock">
+        <div class="mock-head">
+          <span class="mock-ico" data-icon="exam"></span>
+          <div>
+            <span class="badge">本番形式</span>
+            <h2>模試</h2>
+          </div>
+        </div>
+        <p class="desc">言語15問 → 非言語15問を、分野をまぜて本番形式で解きます。時間は言語・非言語それぞれの合計で、残り時間がなくなると次へ進みます。</p>
+        <ul class="mock-spec">
+          <li><b>言語</b>15問</li>
+          <li><b>非言語</b>15問</li>
+          <li><b id="mock-time">約30分</b>持ち時間</li>
+        </ul>
+        <button type="button" class="btn primary big" id="mock-start" data-icon="play">模試をはじめる</button>
+        <p class="total" id="mock-last"></p>
+      </section>
+
       <section class="card" id="weak-card" hidden>
-        <h2>苦手分析</h2>
+        <h2 data-icon="chart">苦手分析</h2>
+        <div class="kpis" id="weak-kpis"></div>
+        <div class="seg sm" id="weak-sort">
+          <button type="button" data-sort="acc" aria-pressed="true">正答率が低い順</button>
+          <button type="button" data-sort="speed" aria-pressed="false">時間がかかる順</button>
+        </div>
         <p class="sub" id="weak-desc"></p>
         <div id="weak-list"></div>
+        <details class="weak-all">
+          <summary>全分野の記録を見る</summary>
+          <div id="weak-all"></div>
+        </details>
+      </section>
+
+      <section class="card" id="badge-card" hidden>
+        <h2 data-icon="award">バッジ<small id="badge-count"></small></h2>
+        <div class="badges" id="badge-list"></div>
       </section>
 
       <section class="card">
-        <h2>非言語（19分野）</h2>
-        <div class="cats" id="cats-nonverbal"></div>
-        <h2 class="gap">言語（9分野）</h2>
-        <div class="cats" id="cats-verbal"></div>
-        <div class="btns"><button type="button" class="btn small" id="reset-stats">記録を消す</button></div>
+        <h2 data-icon="book">分野をえらぶ</h2>
+        <div class="tabs" role="tablist" aria-label="分野のグループ">
+          <button type="button" role="tab" data-gtab="nv" aria-selected="true">非言語<small>19分野</small></button>
+          <button type="button" role="tab" data-gtab="v" aria-selected="false">言語<small>9分野</small></button>
+        </div>
+        <div class="cats" id="cats-nonverbal" role="tabpanel" data-group="nv"></div>
+        <div class="cats" id="cats-verbal" role="tabpanel" data-group="v" hidden></div>
+        <div class="btns"><button type="button" class="btn small danger" id="reset-stats" data-icon="trash"><span class="lbl">記録を消す</span></button></div>
       </section>
 
       <section class="card">
-        <h2>公式・ポイント一覧</h2>
+        <h2 data-icon="pencil">公式・ポイント一覧</h2>
         <p class="sub">分野ごとの公式と解き方のポイントです。本番前の見直しにどうぞ。</p>
         <div id="points-all"></div>
       </section>
@@ -165,10 +243,13 @@
     <section id="quiz" hidden>
       <div class="qhead">
         <div class="meta">
-          <span><b id="q-progress"></b>　<span id="q-cat"></span></span>
-          <span id="q-time"></span>
+          <b id="q-progress"></b>
+          <span class="chip" id="q-cat"></span>
+          <span class="combo" id="q-combo" hidden></span>
+          <span class="timer" id="q-time"></span>
         </div>
         <div class="bar"><div id="q-bar"></div></div>
+        <div class="dots" id="q-dots" aria-hidden="true"></div>
       </div>
       <div class="qgrid">
         <div class="card qmain">
@@ -176,14 +257,14 @@
           <div id="q-choices"></div>
           <div id="q-explain" hidden aria-live="polite"></div>
           <div class="actions">
-            <button type="button" class="btn small" id="q-quit">やめる</button>
+            <button type="button" class="btn small" id="q-quit"><span class="lbl">やめる</span></button>
             <button type="button" class="btn primary" id="q-next" hidden>次へ</button>
           </div>
         </div>
         <aside class="tools" aria-label="メモと電卓">
           <div class="toolbtns">
-            <button type="button" class="btn small" data-tool="memo" aria-pressed="true">メモ</button>
-            <button type="button" class="btn small" data-tool="calc" aria-pressed="true">電卓</button>
+            <button type="button" class="btn small" data-tool="memo" aria-pressed="true" data-icon="pencil">メモ</button>
+            <button type="button" class="btn small" data-tool="calc" aria-pressed="true" data-icon="calc">電卓</button>
           </div>
           <div class="tool" id="tool-memo">
             <div class="tool-head"><span>メモ（指やペンで書けます）</span><button type="button" class="btn small" id="memo-clear">消す</button></div>
@@ -220,20 +301,33 @@
 
     <!-- 結果 -->
     <section id="result" hidden>
-      <section class="card">
-        <p class="score" id="r-score"></p>
+      <section class="card result-top" id="r-top">
+        <div class="score-wrap">
+          <svg class="sring" viewBox="0 0 120 120" aria-hidden="true">
+            <circle class="trk" cx="60" cy="60" r="52"/>
+            <circle class="val" id="r-ring" cx="60" cy="60" r="52" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"/>
+          </svg>
+          <div class="score-in"><b id="r-pct">0%</b><span id="r-score"></span></div>
+        </div>
+        <p class="cheer" id="r-cheer"></p>
         <p id="r-meta"></p>
+        <p class="best" id="r-best" hidden></p>
+        <div class="badges new" id="r-badges" hidden></div>
         <div class="sections" id="r-sections" hidden></div>
         <div id="r-cats"></div>
         <div class="btns">
-          <button type="button" class="btn primary" id="r-miss">間違えた分野をもう一度</button>
-          <button type="button" class="btn" id="r-again">同じ条件でもう一度</button>
-          <button type="button" class="btn" id="r-home">ホームへ</button>
-          <a class="btn" id="r-share" href="#" target="_blank" rel="noopener">Xで共有</a>
+          <button type="button" class="btn primary" id="r-miss" data-icon="retry">間違えた分野をもう一度</button>
+          <button type="button" class="btn" id="r-again" data-icon="retry">同じ条件でもう一度</button>
+          <button type="button" class="btn" id="r-home" data-icon="home">ホームへ</button>
+          <a class="btn" id="r-share" href="#" target="_blank" rel="noopener" data-icon="share">Xで共有</a>
         </div>
       </section>
       <section class="card">
-        <h2>見直し</h2>
+        <h2 data-icon="book">見直し</h2>
+        <div class="seg sm" id="rev-filter">
+          <button type="button" data-f="all" aria-pressed="true">すべて</button>
+          <button type="button" data-f="ng" aria-pressed="false">間違えた問題だけ</button>
+        </div>
         <div id="r-review"></div>
       </section>
     </section>
@@ -255,7 +349,7 @@
         <dd>本番に近い数と形式で、1問ごとに制限時間があります。時間が来ると次の問題へ進みます。画面の横（スマホでは下）のメモと電卓が使え、一部の問題は数値を直接入力して答えます。解説は最後にまとめて出ます。</dd>
       </dl>
       <h3>よくある質問</h3>
-      <dl>
+      <dl class="faq">
         <dt>本物のSPI3の問題ですか？</dt>
         <dd>いいえ。出題形式を参考にして、数値や設定をその場で自動で作ったオリジナルの練習問題です。実際の試験の問題を写したものではありません。</dd>
         <dt>お手軽モードと本番モードの違いは？</dt>
@@ -270,6 +364,7 @@
   </main>
 
   <footer>
+    <img src="icons/icon.svg" alt="" width="28" height="28">
     <p>© <span id="year">2026</span> <a href="https://morilab-garage.com/projects/spi3-drill/">Mori Lab</a> ・ <a href="https://github.com/m-masaki72/spi3-drill">GitHub</a></p>
   </footer>
 </div>
