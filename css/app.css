@@ -231,6 +231,9 @@ svg.ryoiki .rgl { fill: currentColor; font-size: 13px; text-anchor: middle; font
 .keys button { padding: 10px 0; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); cursor: pointer; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
 .keys button.op { color: var(--accent); font-weight: 700; }
 .keys button.eq { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.keys button.eq { grid-row: span 2; }
+.keys button.wide { grid-column: span 2; }
+h2.gap { margin-top: 18px; }
 
 /* 結果 */
 .score { font-size: 1.3rem; margin: 0; }

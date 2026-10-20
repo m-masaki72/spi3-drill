@@ -292,8 +292,9 @@ export const NONVERBAL = [
       }
       const kind = r.int(0, 2);
       if (kind === 0) {
-        const a = r.step(50, 120, 10), b = r.step(50, 120, 10), t = r.int(5, 20);
-        const same = a !== b && r.chance(0.4);
+        const a = r.step(50, 120, 10), t = r.int(5, 20);
+        const b = retry(() => { const x = r.step(50, 120, 10); return x !== a ? x : null; });
+        const same = r.chance(0.4);
         const [hi, lo] = a > b ? [a, b] : [b, a];
         const L = (same ? hi - lo : a + b) * t;
         return same

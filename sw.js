@@ -1,6 +1,6 @@
 // オフライン対応用 Service Worker
 // アプリ本体を更新したら CACHE のバージョンを上げる
-const CACHE = "spi3-drill-v2";
+const CACHE = "spi3-drill-v3";
 const ASSETS = [
   "./",
   "index.html",
@@ -18,7 +18,8 @@ const ASSETS = [
 ];
 
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+  // HTTP キャッシュ（GitHub Pages は max-age=600）の古いファイルを掴まないよう、ネットワークから取り直す
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS.map((u) => new Request(u, { cache: "reload" })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", (e) => {
@@ -34,11 +35,13 @@ self.addEventListener("fetch", (e) => {
   if (req.method !== "GET" || new URL(req.url).origin !== location.origin) return;
 
   // ページ本体：ネットワーク優先（最新版を取りに行き、オフライン時はキャッシュ）
+  // 保存するのはアプリ本体（/ と /index.html）だけ。sitemap.xml などを開いたときに上書きしない
   if (req.mode === "navigate") {
+    const isApp = /^\/(index\.html)?$/.test(new URL(req.url).pathname);
     e.respondWith(
       fetch(req)
         .then((res) => {
-          if (res.ok) {
+          if (res.ok && isApp) {
             const copy = res.clone();
             caches.open(CACHE).then((c) => c.put("index.html", copy));
           }

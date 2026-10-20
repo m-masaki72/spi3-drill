@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>SPI3ドリル（非公式） | 非言語・言語の練習問題が無限に解ける無料Webアプリ</title>
 <meta name="description" content="SPI3の非言語（割合・損益算・速さ・確率・推論・表の読み取りなど17分野）と言語（二語の関係・熟語・語句の用法・長文など9分野）の練習問題を、毎回自動で作って出題する無料のWebアプリ。お手軽モードと、制限時間・メモ・電卓つきの本番モードがあります。登録不要、オフラインでも使えます。">
 <link rel="canonical" href="https://spi3.morilab-garage.com/">
@@ -126,7 +127,7 @@
       <section class="card">
         <h2>非言語（17分野）</h2>
         <div class="cats" id="cats-nonverbal"></div>
-        <h2 style="margin-top:18px">言語（9分野）</h2>
+        <h2 class="gap">言語（9分野）</h2>
         <div class="cats" id="cats-verbal"></div>
         <div class="btns"><button type="button" class="btn small" id="reset-stats">記録を消す</button></div>
       </section>
@@ -185,8 +186,8 @@
                 <button type="button" data-k="1">1</button>
                 <button type="button" data-k="2">2</button>
                 <button type="button" data-k="3">3</button>
-                <button type="button" data-k="=" class="eq" style="grid-row:span 2">=</button>
-                <button type="button" data-k="0" style="grid-column:span 2">0</button>
+                <button type="button" data-k="=" class="eq">=</button>
+                <button type="button" data-k="0" class="wide">0</button>
                 <button type="button" data-k=".">.</button>
               </div>
             </div>
